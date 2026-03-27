@@ -1,62 +1,92 @@
-# Alnora — Golden Hall Gallery
+# Alnora Gallery
 
-A beautiful digital art gallery built with React, Vite, TypeScript, and Tailwind CSS.
+Art gallery web app with:
+- React + Vite + TypeScript frontend
+- Express + SQLite backend
+- Supabase authentication (login/signup)
+- Protected routes for app access
 
-## Setup Instructions
+## Features
 
-### 1. Install dependencies
+- Auth-first app flow (`/auth` required before using the app)
+- Email/password signup + login with Supabase
+- Protected pages (`/`, `/collection`, `/upload`, `/profile`, `/about`)
+- Community artwork upload and voting
+- Owner-only delete for uploaded artworks
+
+## Tech Stack
+
+- Frontend: React, Vite, TypeScript, Tailwind CSS
+- Backend: Node.js, Express, SQLite, Multer
+- Auth: Supabase (`@supabase/supabase-js`)
+
+## Environment Variables
+
+Create a `.env` file in project root:
+
+```env
+VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
+SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+SUPABASE_ANON_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
+```
+
+Notes:
+- Use your Supabase Publishable key (`sb_publishable_...`).
+- Do not commit `.env`.
+
+## Supabase Dashboard Setup
+
+1. Create a Supabase project.
+2. Enable Email provider:
+   - `Authentication > Providers > Email`
+3. Set auth URLs:
+   - `Authentication > URL Configuration`
+   - Site URL: `http://localhost:5173`
+   - Redirect URL: `http://localhost:5173/auth`
+4. Copy Project URL + Publishable key into `.env`.
+
+## Local Development
+
+Install dependencies:
+
 ```bash
 npm install
 ```
 
-### 2. Add your image assets
-Place these images in `src/assets/`:
-- `hero-hallway.jpg`
-- `art-1.jpg`
-- `art-2.jpg`
-- `art-3.jpg`
-- `art-4.jpg`
-- `art-5.jpg`
-- `art-6.jpg`
-- `art-7.jpg`
-- `art-8.jpg`
+Run frontend + backend together:
 
-> You can find these in your Lovable project's asset explorer or GitHub repo under `src/assets/`.
-
-### 3. Run the dev server
 ```bash
-npm run dev
+npm run dev:full
 ```
 
-### 4. Build for production
-```bash
-npm run build
-```
+Frontend:
+- `http://localhost:5173`
+
+Backend API:
+- `http://localhost:3001`
+
+## Scripts
+
+- `npm run dev` - start Vite frontend
+- `npm run server` - start Express backend
+- `npm run dev:full` - run frontend + backend together
+- `npm run build` - production build
+- `npm run preview` - preview production build
+- `npm run test` - run tests
 
 ## Project Structure
 
-```
+```txt
+server/
+  index.js
 src/
-├── assets/          # Image files (add manually)
-├── components/
-│   ├── ui/          # shadcn/ui components
-│   ├── Footer.tsx
-│   ├── GalleryNav.tsx
-│   └── GoldFrame.tsx
-├── data/
-│   └── artworks.ts  # Artwork data
-├── hooks/
-│   ├── use-scroll-reveal.ts
-│   └── use-toast.ts
-├── lib/
-│   └── utils.ts
-├── pages/
-│   ├── About.tsx
-│   ├── ArtworkDetail.tsx
-│   ├── Collection.tsx
-│   ├── Index.tsx
-│   └── NotFound.tsx
-├── App.tsx
-├── index.css
-└── main.tsx
+  components/
+  context/
+  lib/
+  pages/
+  data/
+  hooks/
+  App.tsx
+  main.tsx
 ```
