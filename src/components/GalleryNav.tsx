@@ -1,6 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "@/hooks/use-toast";
 
 const navItems = [
   { label: "Gallery", path: "/" },
@@ -13,6 +15,18 @@ const navItems = [
 export default function GalleryNav() {
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({ title: "Logged out", description: "You have been signed out." });
+      setOpen(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Sign out failed";
+      toast({ title: "Error", description: message, variant: "destructive" });
+    }
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
@@ -36,6 +50,26 @@ export default function GalleryNav() {
               {item.label}
             </Link>
           ))}
+          {user ? (
+            <button
+              onClick={handleSignOut}
+              className="font-body text-lg tracking-wide text-muted-foreground hover:text-foreground transition-colors duration-200"
+              type="button"
+            >
+              Logout
+            </button>
+          ) : (
+            <Link
+              to="/auth"
+              className={`font-body text-lg tracking-wide transition-colors duration-200 ${
+                pathname === "/auth"
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Login
+            </Link>
+          )}
         </div>
 
         {/* Mobile toggle */}
@@ -63,6 +97,25 @@ export default function GalleryNav() {
               {item.label}
             </Link>
           ))}
+          {user ? (
+            <button
+              onClick={handleSignOut}
+              className="block font-body text-lg text-muted-foreground"
+              type="button"
+            >
+              Logout
+            </button>
+          ) : (
+            <Link
+              to="/auth"
+              onClick={() => setOpen(false)}
+              className={`block font-body text-lg ${
+                pathname === "/auth" ? "text-primary" : "text-muted-foreground"
+              }`}
+            >
+              Login
+            </Link>
+          )}
         </div>
       )}
     </nav>

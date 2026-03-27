@@ -5,12 +5,35 @@ import path from 'path';
 import sqlite3 from 'sqlite3';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { createClient } from '@supabase/supabase-js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const envPath = path.join(__dirname, "../.env");
+
+if (fs.existsSync(envPath)) {
+  const lines = fs.readFileSync(envPath, "utf-8").split(/\r?\n/);
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const equalsIndex = line.indexOf("=");
+    if (equalsIndex < 1) continue;
+    const key = line.slice(0, equalsIndex).trim();
+    const value = line.slice(equalsIndex + 1).trim();
+    if (key && process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabase =
+  SUPABASE_URL && SUPABASE_ANON_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
 
 // Middleware
 app.use(cors());
@@ -28,10 +51,14 @@ const db = new sqlite3.Database('./gallery.db', (err) => {
       filename TEXT,
       originalname TEXT,
       title TEXT,
+      username TEXT,
+      user_id TEXT,
       description TEXT,
       uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       votes INTEGER DEFAULT 0
     )`);
+    db.run(`ALTER TABLE user_uploads ADD COLUMN username TEXT`, () => {});
+    db.run(`ALTER TABLE user_uploads ADD COLUMN user_id TEXT`, () => {});
     db.run(`CREATE TABLE IF NOT EXISTS user_preferences (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       artwork_id TEXT,
@@ -60,20 +87,48 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+async function requireAuth(req, res, next) {
+  if (!supabase) {
+    return res.status(500).json({
+      error: 'Server auth is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.',
+    });
+  }
+
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing bearer token' });
+  }
+
+  const token = authHeader.slice('Bearer '.length).trim();
+  if (!token) {
+    return res.status(401).json({ error: 'Invalid bearer token' });
+  }
+
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data?.user) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  req.user = data.user;
+  return next();
+}
+
 // API Routes
-app.post('/api/upload', upload.single('image'), (req, res) => {
+app.post('/api/upload', requireAuth, upload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
-  const { title, description, username } = req.body;
+  const { title, description } = req.body;
+  const username = req.user.email || 'Anonymous';
+  const userId = req.user.id;
   const filename = req.file.filename;
   const originalname = req.file.originalname;
 
   console.log(`Uploading: ${title} by ${username} (${filename})`);
   
-  db.run(`INSERT INTO user_uploads (filename, originalname, title, description, username) VALUES (?, ?, ?, ?, ?)`,
-    [filename, originalname, title, description, username || 'Anonymous'], function(err) {
+  db.run(`INSERT INTO user_uploads (filename, originalname, title, description, username, user_id) VALUES (?, ?, ?, ?, ?, ?)`,
+    [filename, originalname, title, description, username, userId], function(err) {
       if (err) {
         console.error('Error inserting upload:', err);
         return res.status(500).json({ error: 'Database error: ' + err.message });
@@ -140,11 +195,11 @@ app.post('/api/vote/:id', (req, res) => {
   });
 });
 
-app.delete('/api/uploads/:id', (req, res) => {
+app.delete('/api/uploads/:id', requireAuth, (req, res) => {
   const { id } = req.params;
   console.log(`Attempting to delete upload with id: ${id}`);
   
-  db.run(`DELETE FROM user_uploads WHERE id = ?`, [parseInt(id)], function(err) {
+  db.run(`DELETE FROM user_uploads WHERE id = ? AND user_id = ?`, [parseInt(id), req.user.id], function(err) {
     if (err) {
       console.error('Error deleting upload:', err);
       return res.status(500).json({ error: 'Database error: ' + err.message });
@@ -152,7 +207,7 @@ app.delete('/api/uploads/:id', (req, res) => {
     
     if (this.changes === 0) {
       console.warn(`No rows deleted for id: ${id}`);
-      return res.status(404).json({ error: 'Upload not found' });
+      return res.status(404).json({ error: 'Upload not found or not owned by this account' });
     }
     
     console.log(`Successfully deleted upload with id: ${id}`);

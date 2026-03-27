@@ -9,6 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Heart, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 interface UserUpload {
   id: number;
@@ -19,11 +21,20 @@ interface UserUpload {
   username: string;
   uploaded_at: string;
   votes: number;
+  user_id?: string | null;
 }
 
 const eras = ["All", "High Renaissance", "Dutch Golden Age", "Baroque", "Rococo", "Romantic"];
 
-const UserUploadCard = ({ upload, queryClient }: { upload: UserUpload; queryClient: any }) => {
+const UserUploadCard = ({
+  upload,
+  queryClient,
+  canDelete,
+}: {
+  upload: UserUpload;
+  queryClient: any;
+  canDelete: boolean;
+}) => {
   const [voted, setVoted] = useState(false);
 
   const voteMutation = useMutation({
@@ -46,8 +57,15 @@ const UserUploadCard = ({ upload, queryClient }: { upload: UserUpload; queryClie
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       const response = await fetch(`/api/uploads/${upload.id}`, { 
-        method: 'DELETE' 
+        method: 'DELETE',
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
       });
       if (!response.ok) {
         throw new Error('Failed to delete upload');
@@ -90,15 +108,17 @@ const UserUploadCard = ({ upload, queryClient }: { upload: UserUpload; queryClie
             >
               <Heart className={`w-4 h-4 ${voted ? 'fill-red-500' : ''}`} />
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => deleteMutation.mutate()}
-              disabled={deleteMutation.isPending}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            {canDelete && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.isPending}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>
@@ -110,6 +130,7 @@ export default function Collection() {
   const [filter, setFilter] = useState("All");
   const { ref, isVisible } = useScrollReveal();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const filtered = filter === "All" ? artworks : artworks.filter((a) => a.era === filter);
 
   const { data: uploads } = useQuery({
@@ -170,7 +191,12 @@ export default function Collection() {
             <TabsContent value="community">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
                 {uploads?.map((upload: UserUpload) => (
-                  <UserUploadCard key={upload.id} upload={upload} queryClient={queryClient} />
+                  <UserUploadCard
+                    key={upload.id}
+                    upload={upload}
+                    queryClient={queryClient}
+                    canDelete={Boolean(user && upload.user_id === user.id)}
+                  />
                 ))}
               </div>
               {(!uploads || uploads.length === 0) && (

@@ -1,35 +1,38 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-
-interface UserUpload {
-  id: number;
-  filename: string;
-  originalname: string;
-  title: string;
-  description: string;
-  uploaded_at: string;
-  votes: number;
-}
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 const Upload = () => {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [username, setUsername] = useState(() => {
-    return localStorage.getItem('username') || '';
-  });
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  const username =
+    user?.email ??
+    (typeof user?.user_metadata?.full_name === "string"
+      ? user.user_metadata.full_name
+      : "Anonymous");
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
       });
       if (!response.ok) throw new Error('Upload failed');
       return response.json();
@@ -49,9 +52,6 @@ const Upload = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!file || !title || !username) return;
-
-    // Save username to localStorage
-    localStorage.setItem('username', username);
 
     const formData = new FormData();
     formData.append('image', file);
@@ -92,13 +92,8 @@ const Upload = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Your Name</label>
-                <Input
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your name"
-                  required
-                />
+                <label className="block text-sm font-medium mb-2">Uploading as</label>
+                <Input value={username} disabled />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Description</label>

@@ -1,12 +1,11 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Footer from "@/components/Footer";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 interface UserUpload {
   id: number;
@@ -20,11 +19,8 @@ interface UserUpload {
 }
 
 export default function Profile() {
-  const [username, setUsername] = useState(() => {
-    return localStorage.getItem('username') || '';
-  });
-  const [editingName, setEditingName] = useState(false);
-  const [tempName, setTempName] = useState(username);
+  const { user, signOut } = useAuth();
+  const username = user?.email ?? "Anonymous";
 
   const { data: allUploads } = useQuery({
     queryKey: ['uploads'],
@@ -33,12 +29,13 @@ export default function Profile() {
 
   const userUploads = allUploads?.filter((upload: UserUpload) => upload.username === username) || [];
 
-  const handleSaveName = () => {
-    if (tempName.trim()) {
-      localStorage.setItem('username', tempName);
-      setUsername(tempName);
-      setEditingName(false);
-      toast({ title: "Profile updated!", description: "Your name has been changed." });
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({ title: "Logged out", description: "You have been signed out." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Sign out failed";
+      toast({ title: "Error", description: message, variant: "destructive" });
     }
   };
 
@@ -62,37 +59,13 @@ export default function Profile() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Your Name</label>
-                  {editingName ? (
-                    <div className="flex gap-2">
-                      <Input
-                        value={tempName}
-                        onChange={(e) => setTempName(e.target.value)}
-                        placeholder="Enter your name"
-                      />
-                      <Button onClick={handleSaveName}>Save</Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setEditingName(false);
-                          setTempName(username);
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between p-3 bg-muted rounded-md">
-                      <span className="text-lg font-semibold">{username || 'Anonymous'}</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEditingName(true)}
-                      >
-                        Edit
-                      </Button>
-                    </div>
-                  )}
+                  <label className="block text-sm font-medium mb-2">Signed in as</label>
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+                    <span className="text-lg font-semibold">{username}</span>
+                    <Button variant="outline" size="sm" onClick={handleSignOut}>
+                      Logout
+                    </Button>
+                  </div>
                 </div>
 
                 <div>
